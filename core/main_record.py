@@ -6,6 +6,7 @@ from core.loader import load_inventory_csv, load_parquet_dataset, parallel_chunk
 
 MAIN_RECORD_PATH = "state/main_record.parquet"
 
+
 def enforce_types(df):
     for col, dtype in COLUMN_DTYPES.items():
         if col in df.columns:
@@ -35,12 +36,34 @@ def save_main_record(df):
     df = enforce_types(df)
     df.reset_index(drop=True).to_parquet(MAIN_RECORD_PATH, index=False)
 
+# Deduplicate a DataFrame by VIN, keeping the latest status_date
+# Assumes status_date is a string in YYYY-MM-DD or similar format
+
+def deduplicate_by_vin(df):
+    if 'status_date' in df.columns:
+        df['status_date'] = pd.to_datetime(df['status_date'], errors='coerce')
+        df = df.sort_values(['vin', 'status_date'], ascending=[True, False])
+        df = df.drop_duplicates('vin', keep='first')
+    else:
+        df = df.drop_duplicates('vin', keep='first')
+    return df
+
 # Update main record with today's chunk (in-place, chunked)
 def update_main_record_chunk(main_df, today_chunk):
+    today_chunk = deduplicate_by_vin(today_chunk)
     today_chunk = today_chunk.set_index('vin', drop=False)
-    # Update existing VINs
+    # For overlapping VINs, keep the record with the latest status_date
     overlap = main_df.index.intersection(today_chunk.index)
-    main_df.loc[overlap] = today_chunk.loc[overlap]
+    for vin in overlap:
+        # Compare status_date, update only if new is newer
+        try:
+            main_date = pd.to_datetime(main_df.at[vin, 'status_date'], errors='coerce')
+            today_date = pd.to_datetime(today_chunk.at[vin, 'status_date'], errors='coerce')
+            if today_date > main_date:
+                main_df.loc[vin] = today_chunk.loc[vin]
+        except Exception:
+            # If any error, just update
+            main_df.loc[vin] = today_chunk.loc[vin]
     # Add new VINs
     new_vins = today_chunk.index.difference(main_df.index)
     if len(new_vins) > 0:
@@ -56,8 +79,25 @@ def update_main_record_from_feed(today_path, chunksize=100_000, max_workers=4):
             chunk = pd.read_parquet(chunk_path)
             return chunk
         chunk_list = parallel_chunk_process(today_path, process_chunk, max_workers=max_workers)
-        for chunk in chunk_list:
-            main_df = update_main_record_chunk(main_df, chunk)
+        # Concatenate all chunks, deduplicate by VIN (latest status_date)
+        if chunk_list:
+            all_today = pd.concat(chunk_list, ignore_index=True)
+            all_today = deduplicate_by_vin(all_today)
+            all_today = all_today.set_index('vin', drop=False)
+            # Merge with main_df: update only if new is newer
+            overlap = main_df.index.intersection(all_today.index)
+            for vin in overlap:
+                try:
+                    main_date = pd.to_datetime(main_df.at[vin, 'status_date'], errors='coerce')
+                    today_date = pd.to_datetime(all_today.at[vin, 'status_date'], errors='coerce')
+                    if today_date > main_date:
+                        main_df.loc[vin] = all_today.loc[vin]
+                except Exception:
+                    main_df.loc[vin] = all_today.loc[vin]
+            # Add new VINs
+            new_vins = all_today.index.difference(main_df.index)
+            if len(new_vins) > 0:
+                main_df = pd.concat([main_df, all_today.loc[new_vins]], axis=0)
     else:
         # Sequential for CSV
         for chunk in load_inventory_csv(today_path, chunksize=chunksize):
