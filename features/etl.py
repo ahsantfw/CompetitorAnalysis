@@ -2,6 +2,9 @@ import pandas as pd
 import os
 import glob
 import time
+import sys, os
+print(sys.path)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
 from core.main_record import update_main_record_from_feed, load_main_record
 from core.sold_record import update_sold_record
@@ -79,7 +82,13 @@ def process_daily_feed(today_path, today_date):
     print("ETL complete.")
 
 if __name__ == "__main__":
-    # Example usage: process today's file
-    today_path = os.path.join(RAW_DATA_PATH, "inventory_2025_07_23.csv")
-    today_date = "2025-07-23"
+    # Usage: python features/etl.py [input_path] [date]
+    if len(sys.argv) >= 2:
+        today_path = sys.argv[1]
+    else:
+        today_path = os.path.join(RAW_DATA_PATH, "filtered_mc_new_20250723_dataset")  # Default to Parquet dataset dir
+    if len(sys.argv) >= 3:
+        today_date = sys.argv[2]
+    else:
+        today_date = "2025-07-23"
     process_daily_feed(today_path, today_date) 

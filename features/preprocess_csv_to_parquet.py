@@ -1,6 +1,9 @@
 import sys
 import os
 import pandas as pd
+import sys, os
+print(sys.path)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.config import ESSENTIAL_COLUMNS, COLUMN_DTYPES
 
 # Usage: python features/preprocess_csv_to_parquet.py data/yourfile.csv data/yourfile.parquet

@@ -1,5 +1,8 @@
 import pandas as pd
 import os
+import sys, os
+print(sys.path)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.main_record import load_main_record
 from core.sold_record import load_sold_record
 
