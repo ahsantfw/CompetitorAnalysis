@@ -8,9 +8,10 @@ def load_state():
     if os.path.exists(STATE_PATH):
         return pd.read_parquet(STATE_PATH)
     else:
-        return pd.DataFrame(columns=['vin', 'last_seen', 'disappear_count', 'dealer_id', 'make', 'model', 'year'])
+        return pd.DataFrame(columns=['vin', 'last_seen', 'disappear_count', 'dealer_id', 'neo_make', 'neo_model', 'neo_year'])
 
 def save_state(state_df):
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
     state_df.to_parquet(STATE_PATH, index=False)
 
 def update_state(today_df, today_date, prev_state):
@@ -29,7 +30,10 @@ def update_state(today_df, today_date, prev_state):
         new_rows = today_df[today_df['vin'].isin(new_vins)].copy()
         new_rows['last_seen'] = today_date_str
         new_rows['disappear_count'] = 0
-        prev_state = pd.concat([prev_state, new_rows[['vin', 'last_seen', 'disappear_count', 'mc_dealer_id', 'make', 'model', 'year']].rename(columns={'mc_dealer_id':'dealer_id'})], ignore_index=True)
+        prev_state = pd.concat([
+            prev_state,
+            new_rows[['vin', 'last_seen', 'disappear_count', 'mc_dealer_id', 'neo_make', 'neo_model', 'neo_year']].rename(columns={'mc_dealer_id':'dealer_id'})
+        ], ignore_index=True)
     # Mark as sold if disappear_count >= threshold
     sold_mask = prev_state['disappear_count'] >= VIN_DISAPPEAR_DAYS
     sold_vins = prev_state[sold_mask].copy()

@@ -27,6 +27,7 @@ def load_sold_record():
         return pd.DataFrame(columns=ESSENTIAL_COLUMNS + ['sold_date'])
 
 def save_sold_record(df):
+    os.makedirs(os.path.dirname(SOLD_RECORD_PATH), exist_ok=True)
     df = enforce_types(df)
     df.to_parquet(SOLD_RECORD_PATH, index=False)
 

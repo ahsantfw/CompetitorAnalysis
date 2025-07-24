@@ -33,6 +33,7 @@ def load_main_record():
 
 # Save the main record
 def save_main_record(df):
+    os.makedirs(os.path.dirname(MAIN_RECORD_PATH), exist_ok=True)
     df = enforce_types(df)
     df.reset_index(drop=True).to_parquet(MAIN_RECORD_PATH, index=False)
 
