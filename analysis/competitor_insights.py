@@ -19,17 +19,21 @@ def competitor_analysis(make, model, target_zip, client_dealer_id, zip_group=0):
     # Find dealers in zip group
     dealers = dealers_in_zip_group(raw_df, target_zip, zip_group)
     # Filter by make/model and dealers in area (sold)
-    filtered = by_model[(by_model['make'].str.lower() == make.lower()) &
-                        (by_model['model'].str.lower() == model.lower()) &
+    # Use neo_make, neo_model, neo_year for filtering
+    filtered = by_model[(by_model['neo_make'].str.lower() == make.lower()) &
+                        (by_model['neo_model'].str.lower() == model.lower()) &
                         (by_model['mc_dealer_id'].isin(dealers))]
     # Inventory for make/model by dealer
-    inv = raw_df[(raw_df['make'].str.lower() == make.lower()) &
-                 (raw_df['model'].str.lower() == model.lower()) &
+    inv = raw_df[(raw_df['neo_make'].str.lower() == make.lower()) &
+                 (raw_df['neo_model'].str.lower() == model.lower()) &
                  (raw_df['mc_dealer_id'].isin(dealers))]
     inv_counts = inv.groupby('mc_dealer_id').size().reset_index(name='current_inventory')
     # Dealer info lookup (enriched)
     dealer_info_cols = ['mc_dealer_id', 'seller_name', 'city', 'state', 'zip']
-    for col in ['mc_dealership_group_name', 'dealer_type', 'source']:
+    for col in [
+        'mc_dealership_group_name', 'dealer_type', 'source',
+        'latitude', 'longitude', 'seller_phone', 'seller_email',
+        'car_seller_name', 'car_address', 'photo_links']:
         if col in raw_df.columns:
             dealer_info_cols.append(col)
     dealer_info = raw_df.drop_duplicates('mc_dealer_id')[dealer_info_cols]
@@ -38,7 +42,10 @@ def competitor_analysis(make, model, target_zip, client_dealer_id, zip_group=0):
     # Show top competitors
     print(f"\nDealers in zip group {target_zip} +/- {zip_group} who sold {make} {model}:")
     display_cols = ['seller_name', 'city', 'state', 'zip', 'current_inventory', 'sales_count']
-    for col in ['mc_dealership_group_name', 'dealer_type', 'source']:
+    for col in [
+        'mc_dealership_group_name', 'dealer_type', 'source',
+        'latitude', 'longitude', 'seller_phone', 'seller_email',
+        'car_seller_name', 'car_address', 'photo_links']:
         if col in merged.columns:
             display_cols.append(col)
     print(merged.sort_values('sales_count', ascending=False)[display_cols].head(10))

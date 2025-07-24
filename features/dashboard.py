@@ -27,13 +27,13 @@ def main():
     with tab1:
         # Sidebar filters
         st.sidebar.header("Filters")
-        makes = sorted(by_model['make'].unique())
+        makes = sorted(by_model['neo_make'].unique())
         makes = ["All"] + makes
         selected_make = st.sidebar.selectbox("Make", makes)
         if selected_make == "All":
-            models = sorted(by_model['model'].unique())
+            models = sorted(by_model['neo_model'].unique())
         else:
-            models = sorted(by_model[by_model['make'] == selected_make]['model'].unique())
+            models = sorted(by_model[by_model['neo_make'] == selected_make]['neo_model'].unique())
         models = ["All"] + models
         selected_model = st.sidebar.selectbox("Model", models)
         zips = sorted(raw_df['zip'].unique())
@@ -49,23 +49,26 @@ def main():
         # Filter logic
         filtered_by_model = by_model.copy()
         if selected_make != "All":
-            filtered_by_model = filtered_by_model[filtered_by_model['make'] == selected_make]
+            filtered_by_model = filtered_by_model[filtered_by_model['neo_make'] == selected_make]
         if selected_model != "All":
-            filtered_by_model = filtered_by_model[filtered_by_model['model'] == selected_model]
+            filtered_by_model = filtered_by_model[filtered_by_model['neo_model'] == selected_model]
         if selected_zip != "All":
             selected_zip = int(selected_zip)
             dealers_in_area = raw_df[(raw_df['zip'] >= selected_zip - zip_group) & (raw_df['zip'] <= selected_zip + zip_group)]['mc_dealer_id'].unique()
             filtered_by_model = filtered_by_model[filtered_by_model['mc_dealer_id'].isin(dealers_in_area)]
         inv = raw_df.copy()
         if selected_make != "All":
-            inv = inv[inv['make'] == selected_make]
+            inv = inv[inv['neo_make'] == selected_make]
         if selected_model != "All":
-            inv = inv[inv['model'] == selected_model]
+            inv = inv[inv['neo_model'] == selected_model]
         if selected_zip != "All":
             inv = inv[inv['mc_dealer_id'].isin(dealers_in_area)]
         inv_counts = inv.groupby('mc_dealer_id').size().reset_index(name='current_inventory')
         dealer_info_cols = ['mc_dealer_id', 'seller_name', 'city', 'state', 'zip']
-        for col in ['mc_dealership_group_name', 'dealer_type', 'source']:
+        for col in [
+            'mc_dealership_group_name', 'dealer_type', 'source',
+            'latitude', 'longitude', 'seller_phone', 'seller_email',
+            'car_seller_name', 'car_address', 'photo_links']:
             if col in raw_df.columns:
                 dealer_info_cols.append(col)
         dealer_info = raw_df.drop_duplicates('mc_dealer_id')[dealer_info_cols]
@@ -74,7 +77,10 @@ def main():
 
         st.subheader(f"Top Dealers for {selected_make if selected_make != 'All' else '[All Makes]'} {selected_model if selected_model != 'All' else '[All Models]'}" + (f" in Zip {selected_zip} +/- {zip_group}" if selected_zip != 'All' else " (All Zips)"))
         display_cols = ['seller_name', 'city', 'state', 'zip', 'current_inventory', 'sales_count']
-        for col in ['mc_dealership_group_name', 'dealer_type', 'source']:
+        for col in [
+            'mc_dealership_group_name', 'dealer_type', 'source',
+            'latitude', 'longitude', 'seller_phone', 'seller_email',
+            'car_seller_name', 'car_address', 'photo_links']:
             if col in merged.columns:
                 display_cols.append(col)
         if top_n == "All":
