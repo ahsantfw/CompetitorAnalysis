@@ -1,0 +1,25 @@
+# Ignore data and state files
+/data/
+/state/
+*.parquet
+*.csv
+*.xlsx
+*.json
+*.zip
+*.gz
+*.pkl
+*.h5
+*.feather
+*.arrow
+*.sav
+*.bak
+*.tmp
+# Ignore Python cache and virtualenv
+__pycache__/
+*.pyc
+.venv/
+# Ignore Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+# Ignore OS files
+.DS_Store
+Thumbs.db 
