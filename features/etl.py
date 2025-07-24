@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from core.main_record import update_main_record_from_feed, load_main_record
 from core.sold_record import update_sold_record
-from core.loader import load_inventory_csv
+from core.loader import load_inventory_csv, load_parquet_dataset, parallel_chunk_process
 from core.config import RAW_DATA_PATH
 from core.summarizer import update_dealer_sales_summary, update_dealer_sales_by_model
 
@@ -21,13 +21,29 @@ def process_daily_feed(today_path, today_date):
     start_time = time.time()
     # Update main record from today's feed (chunked)
     main_df = update_main_record_from_feed(today_path)
-    # Build set of all VINs from today's file (chunked, memory-safe)
-    today_vins = set()
-    sample_rows = None
-    for i, chunk in enumerate(load_inventory_csv(today_path)):
-        today_vins.update(chunk['vin'])
-        if i == 0:
-            sample_rows = chunk.head(100)
+    # Choose loader based on file type
+    if os.path.isdir(today_path) or today_path.endswith('.parquet/'):
+        # Parallel processing for Parquet dataset
+        def get_vins(chunk_path):
+            chunk = pd.read_parquet(chunk_path)
+            return set(chunk['vin'])
+        def get_sample_rows(chunk_path):
+            chunk = pd.read_parquet(chunk_path)
+            return chunk.head(100)
+        # VIN collection
+        vin_sets = parallel_chunk_process(today_path, get_vins, max_workers=4)
+        today_vins = set().union(*vin_sets)
+        # Sample rows (just from the first chunk)
+        chunk_files = sorted([os.path.join(today_path, f) for f in os.listdir(today_path) if f.endswith('.parquet')])
+        sample_rows = pd.read_parquet(chunk_files[0]).head(100) if chunk_files else None
+    else:
+        # Sequential for CSV
+        today_vins = set()
+        sample_rows = None
+        for i, chunk in enumerate(load_inventory_csv(today_path)):
+            today_vins.update(chunk['vin'])
+            if i == 0:
+                sample_rows = chunk.head(100)
     # Use main_df for sold detection
     sold_record = update_sold_record(main_df, pd.DataFrame({'vin': list(today_vins)}), today_date)
     print(f"Sold cars updated: {len(sold_record)} total")
@@ -64,6 +80,6 @@ def process_daily_feed(today_path, today_date):
 
 if __name__ == "__main__":
     # Example usage: process today's file
-    today_path = os.path.join(RAW_DATA_PATH, "inventory_2025_07_24.csv")
-    today_date = "2025-07-24"
+    today_path = os.path.join(RAW_DATA_PATH, "inventory_2025_07_23.csv")
+    today_date = "2025-07-23"
     process_daily_feed(today_path, today_date) 
