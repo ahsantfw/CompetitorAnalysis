@@ -12,17 +12,22 @@ from core.config import RAW_DATA_PATH
 from core.summarizer import update_dealer_sales_summary, update_dealer_sales_by_model
 
 def cleanup_old_files(data_dir, keep_days=2):
+    print(f"[CLEANUP] Checking for old files in {data_dir} (keep {keep_days} days)...")
     now = time.time()
+    deleted = 0
     for f in glob.glob(os.path.join(data_dir, '*.csv')):
         if os.stat(f).st_mtime < now - keep_days * 86400:
-            print(f"Deleting old file: {f}")
+            print(f"[CLEANUP] Deleting old file: {f}")
             os.remove(f)
+            deleted += 1
+    print(f"[CLEANUP] Done. Deleted {deleted} old files.")
 
 def process_daily_feed(today_path, today_date, max_workers=4):
-    print(f"Processing daily feed: {today_path}")
+    print(f"[ETL] Processing daily feed: {today_path}")
     start_time = time.time()
     # Update main record from today's feed (chunked, parallel for Parquet)
     main_df = update_main_record_from_feed(today_path, max_workers=max_workers)
+    print(f"[ETL] Main record updated. Rows: {len(main_df)}")
     # Choose loader based on file type
     if os.path.isdir(today_path) or today_path.endswith('.parquet/'):
         # Parallel processing for Parquet dataset
@@ -46,13 +51,15 @@ def process_daily_feed(today_path, today_date, max_workers=4):
             today_vins.update(chunk['vin'])
             if i == 0:
                 sample_rows = chunk.head(100)
+    print(f"[ETL] VIN collection complete. Unique VINs today: {len(today_vins)}")
     # Use main_df for sold detection
     sold_record = update_sold_record(main_df, pd.DataFrame({'vin': list(today_vins)}), today_date)
-    print(f"Sold cars updated: {len(sold_record)} total")
+    print(f"[ETL] Sold record updated. Rows: {len(sold_record)}")
     # Update dealer summaries
     summary = update_dealer_sales_summary()
+    print(f"[ETL] Dealer sales summary updated. Dealers: {len(summary)}")
     by_model = update_dealer_sales_by_model()
-    print(f"Dealer summary updated: {len(summary)} dealers, {len(by_model)} dealer-models")
+    print(f"[ETL] Dealer sales by model updated. Dealer-models: {len(by_model)}")
     # Monitoring sample file
     monitor_path = "state/monitoring_sample.csv"
     monitor_rows = []
@@ -74,11 +81,11 @@ def process_daily_feed(today_path, today_date, max_workers=4):
     }])
     monitor_rows.append(summary_row)
     pd.concat(monitor_rows, ignore_index=True).to_csv(monitor_path, index=False)
-    print(f"Monitoring sample written to {monitor_path}")
-    print(f"Total ETL time: {elapsed_min} minutes")
+    print(f"[ETL] Monitoring sample written to {monitor_path}")
+    print(f"[ETL] Total ETL time: {elapsed_min} minutes")
     # Clean up old files
     cleanup_old_files(os.path.dirname(today_path), keep_days=2)
-    print("ETL complete.")
+    print("[ETL] ETL complete.")
 
 if __name__ == "__main__":
     # Usage: python features/etl.py [input_path] [date] [max_workers]
