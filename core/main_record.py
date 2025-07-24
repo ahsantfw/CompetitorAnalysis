@@ -1,9 +1,8 @@
 import pandas as pd
-import os
 import sys, os
-print(sys.path)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.config import ESSENTIAL_COLUMNS, COLUMN_DTYPES
+from core.loader import load_inventory_csv, load_parquet_dataset, parallel_chunk_process
 
 MAIN_RECORD_PATH = "state/main_record.parquet"
 
@@ -48,11 +47,20 @@ def update_main_record_chunk(main_df, today_chunk):
         main_df = pd.concat([main_df, today_chunk.loc[new_vins]], axis=0)
     return main_df
 
-# Full update for a day's feed (chunked)
-def update_main_record_from_feed(today_path, chunksize=100_000):
+# Full update for a day's feed (chunked, parallel for Parquet)
+def update_main_record_from_feed(today_path, chunksize=100_000, max_workers=4):
     main_df = load_main_record()
-    from core.loader import load_inventory_csv
-    for chunk in load_inventory_csv(today_path, chunksize=chunksize):
-        main_df = update_main_record_chunk(main_df, chunk)
+    if os.path.isdir(today_path) or today_path.endswith('.parquet/'):
+        # Parallel processing for Parquet dataset
+        def process_chunk(chunk_path):
+            chunk = pd.read_parquet(chunk_path)
+            return chunk
+        chunk_list = parallel_chunk_process(today_path, process_chunk, max_workers=max_workers)
+        for chunk in chunk_list:
+            main_df = update_main_record_chunk(main_df, chunk)
+    else:
+        # Sequential for CSV
+        for chunk in load_inventory_csv(today_path, chunksize=chunksize):
+            main_df = update_main_record_chunk(main_df, chunk)
     save_main_record(main_df)
     return main_df 

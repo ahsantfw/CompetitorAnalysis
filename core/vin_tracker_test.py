@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import time
 import sys, os
-print(sys.path)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.vin_tracker import load_state, save_state, update_state
 from core.config import VIN_DISAPPEAR_DAYS

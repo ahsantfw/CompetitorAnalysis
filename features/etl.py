@@ -3,7 +3,6 @@ import os
 import glob
 import time
 import sys, os
-print(sys.path)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
 from core.main_record import update_main_record_from_feed, load_main_record
@@ -19,11 +18,11 @@ def cleanup_old_files(data_dir, keep_days=2):
             print(f"Deleting old file: {f}")
             os.remove(f)
 
-def process_daily_feed(today_path, today_date):
+def process_daily_feed(today_path, today_date, max_workers=4):
     print(f"Processing daily feed: {today_path}")
     start_time = time.time()
-    # Update main record from today's feed (chunked)
-    main_df = update_main_record_from_feed(today_path)
+    # Update main record from today's feed (chunked, parallel for Parquet)
+    main_df = update_main_record_from_feed(today_path, max_workers=max_workers)
     # Choose loader based on file type
     if os.path.isdir(today_path) or today_path.endswith('.parquet/'):
         # Parallel processing for Parquet dataset
@@ -34,7 +33,7 @@ def process_daily_feed(today_path, today_date):
             chunk = pd.read_parquet(chunk_path)
             return chunk.head(100)
         # VIN collection
-        vin_sets = parallel_chunk_process(today_path, get_vins, max_workers=4)
+        vin_sets = parallel_chunk_process(today_path, get_vins, max_workers=max_workers)
         today_vins = set().union(*vin_sets)
         # Sample rows (just from the first chunk)
         chunk_files = sorted([os.path.join(today_path, f) for f in os.listdir(today_path) if f.endswith('.parquet')])
@@ -82,7 +81,7 @@ def process_daily_feed(today_path, today_date):
     print("ETL complete.")
 
 if __name__ == "__main__":
-    # Usage: python features/etl.py [input_path] [date]
+    # Usage: python features/etl.py [input_path] [date] [max_workers]
     if len(sys.argv) >= 2:
         today_path = sys.argv[1]
     else:
@@ -91,4 +90,8 @@ if __name__ == "__main__":
         today_date = sys.argv[2]
     else:
         today_date = "2025-07-23"
-    process_daily_feed(today_path, today_date) 
+    if len(sys.argv) >= 4:
+        max_workers = int(sys.argv[3])
+    else:
+        max_workers = 4
+    process_daily_feed(today_path, today_date, max_workers=max_workers) 
