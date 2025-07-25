@@ -47,9 +47,13 @@ def save_main_record(df):
 def deduplicate_by_vin(df):
     if 'status_date' in df.columns:
         df['status_date'] = pd.to_datetime(df['status_date'], errors='coerce')
+        df = df.reset_index(drop=True)
+        print(f"[MAIN] Reset index before deduplication. Shape: {df.shape}")
         df = df.sort_values(['vin', 'status_date'], ascending=[True, False])
         df = df.drop_duplicates('vin', keep='first')
     else:
+        df = df.reset_index(drop=True)
+        print(f"[MAIN] Reset index before deduplication. Shape: {df.shape}")
         df = df.drop_duplicates('vin', keep='first')
     return df
 
@@ -97,8 +101,10 @@ def update_main_record_from_feed(today_path, chunksize=100_000, max_workers=4):
             batch_df = batch_df.set_index('vin', drop=False)
             combined = pd.concat([main_df, batch_df], axis=0)
             combined['status_date'] = pd.to_datetime(combined['status_date'], errors='coerce')
+            combined = combined.reset_index(drop=True)
+            print(f"[MAIN] Reset index before sorting/merge. Shape: {combined.shape}")
             combined = combined.sort_values(['vin', 'status_date'], ascending=[True, False])
-            combined = combined[~combined.index.duplicated(keep='first')]
+            combined = combined.drop_duplicates('vin', keep='first')
             main_df = combined
             total_rows += len(batch_df)
             print(f"[MAIN] Batch {batch_num}: Main record updated. Current shape: {main_df.shape}")
@@ -118,8 +124,10 @@ def update_main_record_from_feed(today_path, chunksize=100_000, max_workers=4):
         all_today = all_today.set_index('vin', drop=False)
         combined = pd.concat([main_df, all_today], axis=0)
         combined['status_date'] = pd.to_datetime(combined['status_date'], errors='coerce')
+        combined = combined.reset_index(drop=True)
+        print(f"[MAIN] Reset index before sorting/merge. Shape: {combined.shape}")
         combined = combined.sort_values(['vin', 'status_date'], ascending=[True, False])
-        combined = combined[~combined.index.duplicated(keep='first')]
+        combined = combined.drop_duplicates('vin', keep='first')
         main_df = combined
         print(f"[MAIN] Merge complete. Combined shape: {main_df.shape}")
     t4 = time.time()
