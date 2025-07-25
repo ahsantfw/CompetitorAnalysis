@@ -24,11 +24,13 @@ def load_parquet_dataset(dataset_dir):
         yield chunk
 
 def parallel_chunk_process(dataset_dir, func, max_workers=4):
-    # Applies func(chunk_path) in parallel to all Parquet chunk files, returns list of results
+    # Processes files in batches of max_workers, yielding results batch by batch
     files = sorted([os.path.join(dataset_dir, f) for f in os.listdir(dataset_dir) if f.endswith('.parquet')])
-    results = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(func, f) for f in files]
-        for future in as_completed(futures):
-            results.append(future.result())
-    return results 
+    for i in range(0, len(files), max_workers):
+        batch = files[i:i+max_workers]
+        results = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(func, f) for f in batch]
+            for future in as_completed(futures):
+                results.append(future.result())
+        yield results 
