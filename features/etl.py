@@ -37,8 +37,10 @@ def process_daily_feed(today_path, today_date, max_workers=4):
         def get_sample_rows(chunk_path):
             chunk = pd.read_parquet(chunk_path)
             return chunk.head(100)
-        # VIN collection
-        vin_sets = parallel_chunk_process(today_path, get_vins, max_workers=max_workers)
+        # VIN collection (flatten batches)
+        vin_sets = []
+        for batch in parallel_chunk_process(today_path, get_vins, max_workers=max_workers):
+            vin_sets.extend(batch)
         today_vins = set().union(*vin_sets)
         # Sample rows (just from the first chunk)
         chunk_files = sorted([os.path.join(today_path, f) for f in os.listdir(today_path) if f.endswith('.parquet')])
